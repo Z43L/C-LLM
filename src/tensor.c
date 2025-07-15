@@ -10,16 +10,16 @@
  * 			memoria para los datos y los gradientes e inicializamos a cero y liberamos 
  * 			memoria en caso de error
  */
-Tensor* create_tensor(int filas, int columnas)
+t_tensor* create_tensor(int filas, int columnas)
 {
-	Tensor* t = (Tensor*)malloc(sizeof(Tensor));
+	t_tensor* t = (t_tensor*)malloc(sizeof(t_tensor));
 	if(!t)
 	{
 		fprintf(stderr, "error no se pudo asignar  memoria al tensor\n");
 		retun NULL;
 	}
 	t->rows = filas;
-	t-cols = columnas;
+	t->cols = columnas;
 	int numero_elementos = filas * columnas;
 	t->data = (float*)calloc(numero_elementos,sizeof(float));
 	t->grad = (float*)calloc(numero_elementos,sizeof(float));
@@ -34,12 +34,12 @@ Tensor* create_tensor(int filas, int columnas)
 	return t;
 }
 
-void free_tensor(Tensor* t)
+void free_tensor(t_tensor* t)
 {
 	if(t != NULL)
 	{
 		free(t->data);
-		free(t-grand);
+		free(t->grad);
 		free(t);
 	}
 }
@@ -50,11 +50,11 @@ void free_tensor(Tensor* t)
  * NO return
  * descriptcion	 ---> imprime el contenido de un tensor de forma legible
  */
-void print_tensor(const Tensor* t, const char* name)
+void print_tensor(const t_tensor* t, const char* name)
 {
 	if(!t)
 		return;
-	printf("tensor %s (%d x %d)\n ", name, t->rows, t-cols);
+	printf("tensor %s (%d x %d)\n ", name, t->rows, t->cols);
 	int i = 0;
 	while(i < t->rows)
 	{
@@ -79,7 +79,7 @@ void print_tensor(const Tensor* t, const char* name)
  * descripcion ---> rellena un tensor con valores aleatorios
  */
 
- void fill_tensor_random(Tensor* t, float scale)
+ void fill_tensor_random(t_tensor* t, float scale)
  {
  	if(!t)
 		return;
@@ -93,7 +93,6 @@ void print_tensor(const Tensor* t, const char* name)
 		i++;
 	}
  }
-
 
 
 

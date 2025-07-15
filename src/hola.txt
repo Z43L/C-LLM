@@ -1,0 +1,129 @@
+hola ### Cómo Guardar y Cargar un Modelo de Tokenizador en C
+
+Guardar un modelo de tokenizador en C implica serializar sus estructuras de datos (como el vocabulario o tokens) en un archivo, para luego cargarlo y reconstruirlo en memoria. Dado que C no tiene soporte nativo para serialización como lenguajes de alto nivel, se debe implementar manualmente usando operaciones de archivos (e.g., `fwrite` y `fread` para binario, o `fprintf` y `fscanf` para texto). Basado en prácticas estándar de serialización de estructuras[1][2][3], a continuación detallo un enfoque paso a paso, asumiendo una estructura similar a la del código proporcionado (e.g., `t_token` con un array de `char**` para tokens).
+
+#### 1. Entender el Modelo del Tokenizador
+- El "modelo" típicamente incluye el vocabulario (lista de tokens) y parámetros como dimensiones o media[4].
+- En tu código, parece que `t_token` contiene `char **token` (array de strings), `filename`, `filenamecorpus`, etc.
+- Para guardar, serializa estos datos de forma que puedas reconstruir la estructura exacta al cargar.
+
+#### 2. Guardar el Modelo (Serialización)
+Usa un formato binario para eficiencia, o texto para legibilidad. Aquí un ejemplo en binario, que preserva la estructura exacta[1].
+
+**Ejemplo de Función para Guardar:**
+```c
+#include 
+#include 
+#include 
+
+// Asumiendo tu estructura t_token (simplificada)
+typedef struct {
+    char **token;  // Array de strings
+    int num_tokens;  // Número de tokens
+    char *filename;
+    // Otros campos...
+} t_token;
+
+void guardar_modelo(t_token *token, const char *archivo) {
+    FILE *fp = fopen(archivo, "wb");
+    if (!fp) {
+        perror("Error al abrir archivo");
+        return;
+    }
+
+    // Guardar número de tokens
+    fwrite(&token->num_tokens, sizeof(int), 1, fp);
+
+    // Guardar cada token (longitud + datos)
+    for (int i = 0; i num_tokens; i++) {
+        int len = strlen(token->token[i]) + 1;  // Incluir null terminator
+        fwrite(&len, sizeof(int), 1, fp);
+        fwrite(token->token[i], sizeof(char), len, fp);
+    }
+
+    // Guardar otros campos (ejemplo: filename)
+    int len_filename = strlen(token->filename) + 1;
+    fwrite(&len_filename, sizeof(int), 1, fp);
+    fwrite(token->filename, sizeof(char), len_filename, fp);
+
+    // Agrega más campos según tu estructura
+    fclose(fp);
+}
+```
+- **Explicación:** Escribe primero el tamaño de los arrays, luego los datos. Esto evita problemas con punteros y longitudes variables[2][3].
+- Llama a esta función después de entrenar o cargar el vocabulario, e.g., `guardar_modelo(&mi_token, "modelo.bin");`.
+
+#### 3. Cargar el Modelo (Deserialización)
+Lee el archivo y alloca memoria para reconstruir la estructura.
+
+**Ejemplo de Función para Cargar:**
+```c
+t_token *cargar_modelo(const char *archivo) {
+    FILE *fp = fopen(archivo, "rb");
+    if (!fp) {
+        perror("Error al abrir archivo");
+        return NULL;
+    }
+
+    t_token *token = malloc(sizeof(t_token));
+    if (!token) {
+        fclose(fp);
+        return NULL;
+    }
+
+    // Leer número de tokens
+    fread(&token->num_tokens, sizeof(int), 1, fp);
+
+    // Alloc y leer tokens
+    token->token = malloc(sizeof(char*) * token->num_tokens);
+    for (int i = 0; i num_tokens; i++) {
+        int len;
+        fread(&len, sizeof(int), 1, fp);
+        token->token[i] = malloc(sizeof(char) * len);
+        fread(token->token[i], sizeof(char), len, fp);
+    }
+
+    // Leer otros campos (ejemplo: filename)
+    int len_filename;
+    fread(&len_filename, sizeof(int), 1, fp);
+    token->filename = malloc(sizeof(char) * len_filename);
+    fread(token->filename, sizeof(char), len_filename, fp);
+
+    // Agrega más campos según tu estructura
+    fclose(fp);
+    return token;
+}
+```
+- **Explicación:** Lee en el mismo orden que se guardó, allocando memoria dinámica para arrays y strings[1][3].
+- Uso: `t_token *mi_token = cargar_modelo("modelo.bin");`.
+
+#### 4. Consideraciones Importantes
+- **Formato Binario vs. Texto:** Binario es más rápido y compacto, pero no portable entre arquitecturas (e.g., endianness). Para texto, usa `fprintf` para escribir delimitado por comas o líneas[5].
+- **Manejo de Errores:** Siempre verifica `fopen`, `fread` y allocaciones para evitar crashes.
+- **Limpieza de Memoria:** Libera memoria con `free` después de usar (e.g., loop para `token->token[i]` y luego `token->token`).
+- **Integración con tu Código:** Adapta a funciones como `cargarvocabulario` o `readcorpus`. Por ejemplo, llama a `guardar_modelo` después de `addtoken`[4].
+- **Limitaciones:** Si el modelo es grande, considera compresión o formatos como JSON (usando librerías externas como cJSON)[6]. Para ML avanzado, integra con bibliotecas como TensorFlow, pero eso requiere wrappers en C[7].
+
+Este método asegura que puedas guardar y cargar el tokenizador de forma reutilizable, similar a cómo se hace en entornos de ML[6][8]. Si tu estructura es más compleja, ajusta las funciones accordingly.
+
+[1] https://learn.microsoft.com/es-es/dotnet/standard/native-interop/customize-struct-marshalling
+[2] https://learn.microsoft.com/es-es/cpp/dotnet/how-to-marshal-structures-using-cpp-interop?view=msvc-170
+[3] https://biblus.us.es/bibing/proyectos/use/abreproy/10975/fichero/CAPITULO+3_Serializacion.pdf
+[4] https://huggingface.co/learn/llm-course/es/chapter6/2
+[5] https://es.stackoverflow.com/questions/148588/guardar-datos-de-archivo-de-texto-separados-por
+[6] https://learn.microsoft.com/es-es/dotnet/machine-learning/how-to-guides/save-load-machine-learning-models-ml-net
+[7] https://www.tensorflow.org/guide/keras/save_and_serialize
+[8] https://www.juansensio.com/blog/054_pytorch_save
+[9] https://ppl-ai-file-upload.s3.amazonaws.com/web/direct-files/attachments/1820772/68803c90-223b-4eae-87e6-ad4bc38c0d0c/tokenizador.c
+[10] https://www.reddit.com/r/cpp_questions/comments/1cva5ww/whats_the_best_way_to_store_tokenization_data/?tl=es-419
+[11] https://www.youtube.com/watch?v=z_pukhnwjZc
+[12] https://learn.microsoft.com/es-es/dotnet/api/microsoft.ml.textcatalog.tokenizeintocharactersaskeys?view=ml-dotnet-preview
+[13] https://www.aprendemachinelearning.com/generacion-de-texto-en-espanol-con-gpt-2/
+[14] https://app.certidevs.com/tecnologias/3e939f26-6007-4623-80d9-6421cc477e72/leccion/52418278-dee1-4094-8e8c-5fca715cfaaa
+[15] https://www.reddit.com/r/learnmachinelearning/comments/10t1i7s/cuda_out_of_memory_anything_i_can_do_to_fix_it/?tl=es-es
+[16] https://www.garcia-ferreira.es/guardar-un-modelo-para-entorno-real/
+[17] https://mgarciaisaia.github.io/tutorial-c/blog/2015/02/27/dream-of-serialization/
+[18] https://www.youtube.com/watch?v=9nOypH7Rg9I
+[19] https://www.reddit.com/r/MLQuestions/comments/1lv61w5/how_to_save_and_then_load_model_with_custom/?tl=es-419
+[20] https://www.youtube.com/watch?v=00bm1VBf-J0
+[21] https://cloud.google.com/spanner/docs/full-text-search/tokenization
